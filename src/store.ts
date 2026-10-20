@@ -79,6 +79,11 @@ export const useAppStore = create<State>()((set, get) => {
     if (!user || (admin && user.role !== 'admin')) throw new Error('ليست لديك صلاحية لهذه العملية')
     return user
   }
+  const accessInventory = () => {
+    const user = access()
+    if (!['admin', 'warehouse_manager'].includes(user.role)) throw new Error('هذه العملية متاحة للمدير أو مدير المخزن فقط')
+    return user
+  }
   const fiscalFor = (date: string) => {
     const key = date.slice(0, 10), years = get().fiscalYears
     const year = years.find(y => key >= y.startDate && key <= y.endDate)
@@ -126,7 +131,7 @@ export const useAppStore = create<State>()((set, get) => {
       await commit({ users: get().users.map(u => u.id === userId ? { ...u, active: !u.active } : u) })
     },
     addProduct: async product => {
-      access(true); required(product.name)
+      accessInventory(); required(product.name)
       const sku = product.sku?.trim() || id('PRD')
       if (get().products.some(p => p.sku === sku || (product.barcode && p.barcode === product.barcode))) throw new Error('رمز المنتج أو الباركود موجود بالفعل')
       const trackBatches = Boolean(product.trackBatches), trackExpiry = Boolean(product.trackExpiry)
@@ -136,7 +141,7 @@ export const useAppStore = create<State>()((set, get) => {
       await commit({ products: [...get().products, p], movements: p.trackInventory && p.stock ? [{ id: id('MOV'), productId: p.id, name: p.name, amount: p.stock, date: now(), reason: 'رصيد افتتاحي', balance: p.stock }, ...get().movements] : get().movements })
     },
     editProduct: async product => {
-      access(true); required(product.name)
+      accessInventory(); required(product.name)
       if (get().products.some(p => p.id !== product.id && (p.sku === product.sku || (product.barcode && p.barcode === product.barcode)))) throw new Error('رمز المنتج أو الباركود موجود بالفعل')
       const old = get().products.find(p => p.id === product.id)
       if (!old) throw new Error('المنتج غير موجود')
@@ -217,7 +222,7 @@ export const useAppStore = create<State>()((set, get) => {
       return sale
     },
     completePurchase: async (supplierId, cart, paid, date, note) => {
-      access(true); const state = get(), supplier = state.suppliers.find(s => s.id === supplierId)
+      accessInventory(); const state = get(), supplier = state.suppliers.find(s => s.id === supplierId)
       if (!supplier || !cart.length) throw new Error('اختر المورد وأضف الأصناف')
       if (!validDate(date)) throw new Error('التاريخ غير صالح')
       const fiscalYearId = fiscalFor(date).id
@@ -231,7 +236,9 @@ export const useAppStore = create<State>()((set, get) => {
           if (l.productionDate && !validDate(l.productionDate)) throw new Error('تاريخ الإنتاج غير صالح')
           if (l.productionDate && l.expiryDate && l.productionDate > l.expiryDate) throw new Error('تاريخ الإنتاج يجب أن يسبق انتهاء الصلاحية')
         }
-        const salePrice = l.salePrice === undefined ? p.price : amount(l.salePrice)\n        if (l.barcode?.trim() && [...state.products.flatMap(product => [product.barcode, ...(product.barcodes || []).map(b => b.code)]), ...state.batches.map(batch => batch.barcode)].some(code => code === l.barcode!.trim())) throw new Error('الباركود مستخدم مسبقاً')\n        return { productId: p.id, name: p.name, unit: p.unit, qty: l.qty, cost: amount(l.cost), price: salePrice }
+        const salePrice = l.salePrice === undefined ? p.price : amount(l.salePrice)
+        if (l.barcode?.trim() && [...state.products.flatMap(product => [product.barcode, ...(product.barcodes || []).map(b => b.code)]), ...state.batches.map(batch => batch.barcode)].some(code => code === l.barcode!.trim())) throw new Error('الباركود مستخدم مسبقاً')
+        return { productId: p.id, name: p.name, unit: p.unit, qty: l.qty, cost: amount(l.cost), price: salePrice }
       })
       const total = amount(lines.reduce((n, l) => n + l.qty * l.cost, 0)); amount(paid)
       if (paid > total) throw new Error('المدفوع أكبر من الإجمالي')
@@ -244,7 +251,8 @@ export const useAppStore = create<State>()((set, get) => {
         let batchId: string | undefined
         if (p.trackBatches) {
           const input = cart.find(item => item.productId === p.id)!, lotNumber = input.lotNumber!.trim()
-          const inputBarcode = input.barcode?.trim() || undefined\n          const batch: InventoryBatch = { id: id('BAT'), productId: p.id, lotNumber, quantity: l.qty, unitCost: l.cost, unitSalePrice: l.price, ...(inputBarcode ? { barcode: inputBarcode } : {}), supplierId, purchaseId: purchase.id, createdAt: now(), ...(input.productionDate ? { productionDate: input.productionDate } : {}), ...(input.expiryDate ? { expiryDate: input.expiryDate } : {}) }
+          const inputBarcode = input.barcode?.trim() || undefined
+          const batch: InventoryBatch = { id: id('BAT'), productId: p.id, lotNumber, quantity: l.qty, unitCost: l.cost, unitSalePrice: l.price, ...(inputBarcode ? { barcode: inputBarcode } : {}), supplierId, purchaseId: purchase.id, createdAt: now(), ...(input.productionDate ? { productionDate: input.productionDate } : {}), ...(input.expiryDate ? { expiryDate: input.expiryDate } : {}) }
           batches.push(batch); batchId = batch.id
         }
         movements.unshift({ id: id('MOV'), productId: p.id, name: p.name, amount: l.qty, date, reason: purchase.id, balance: stock, ...(batchId ? { batchId } : {}) })
