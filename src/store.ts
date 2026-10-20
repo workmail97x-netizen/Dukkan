@@ -81,7 +81,7 @@ export const useAppStore = create<State>()((set, get) => {
   }
   const accessInventory = () => {
     const user = access()
-    if (!['admin', 'warehouse_manager'].includes(user.role)) throw new Error('هذه العملية متاحة للمدير أو مدير المخزن فقط')
+    if (!['admin', 'warehouse_manager'].includes(user.role)) throw new Error('ليست لديك صلاحية لهذه العملية؛ متاحة للمدير أو مدير المخزن فقط')
     return user
   }
   const fiscalFor = (date: string) => {
