@@ -1,0 +1,30 @@
+name: Validate library inventory changes
+
+on:
+  push:
+    branches: [feature/library-batch-barcodes]
+    paths:
+      - 'src/**'
+      - 'package*.json'
+      - '.github/workflows/library-validation.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: TypeScript and production build
+        run: npm run build
+      - name: Automated tests
+        run: npm test
