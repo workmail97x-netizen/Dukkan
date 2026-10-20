@@ -167,17 +167,26 @@ export const useAppStore = create<State>()((set, get) => {
           const selected: BatchAllocation[] = []
           for (const batch of eligible) {
             const quantity = Math.min(remaining, batch.quantity)
-            if (quantity) selected.push({ batchId: batch.id, lotNumber: batch.lotNumber, quantity, unitCost: batch.unitCost, ...(batch.expiryDate ? { expiryDate: batch.expiryDate } : {}) })
+            if (quantity) selected.push({ batchId: batch.id, lotNumber: batch.lotNumber, quantity, unitCost: batch.unitCost, unitSalePrice: batch.unitSalePrice ?? p.price, ...(batch.expiryDate ? { expiryDate: batch.expiryDate } : {}) })
             remaining -= quantity
             if (!remaining) break
           }
           if (remaining) throw new Error('الكمية الصالحة للبيع غير كافية: ' + p.name)
           allocations.set(productId, selected)
-          const costTotal = selected.reduce((total, allocation) => total + allocation.quantity * allocation.unitCost, 0)
-          return { productId, qty, name: p.name, price: p.price, cost: Math.round(costTotal / qty), unit: p.unit, batchAllocations: selected }
+          // Keep different batch prices on separate invoice lines so the receipt and revenue remain exact.
+          const byPrice = new Map<number, BatchAllocation[]>()
+          for (const allocation of selected) {
+            const price = allocation.unitSalePrice ?? p.price
+            byPrice.set(price, [...(byPrice.get(price) || []), allocation])
+          }
+          return [...byPrice.entries()].map(([price, group]) => {
+            const groupQty = group.reduce((n, allocation) => n + allocation.quantity, 0)
+            const costTotal = group.reduce((n, allocation) => n + allocation.quantity * allocation.unitCost, 0)
+            return { productId, qty: groupQty, name: p.name, price, cost: Math.round(costTotal / groupQty), unit: p.unit, batchAllocations: group }
+          })
         }
-        return { productId, qty, name: p.name, price: p.price, cost: p.cost, unit: p.unit }
-      })
+        return [{ productId, qty, name: p.name, price: p.price, cost: p.cost, unit: p.unit }]
+      }).flat()
       const subtotal = amount(lines.reduce((n, l) => n + l.qty * l.price, 0))
       if (discount > subtotal) throw new Error('الخصم أكبر من إجمالي الفاتورة')
       const total = subtotal - discount, customer = state.customers.find(c => c.id === customerId)
