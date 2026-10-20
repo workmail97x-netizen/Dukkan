@@ -7,7 +7,7 @@ import {
   ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Store, Tag, Trash2, TrendingUp, Truck, UserPlus,
   Users, WalletCards, X, Zap
 } from 'lucide-react'
-import { useAppStore, isAdmin } from './store'
+import { useAppStore, isAdmin, canManageInventory } from './store'
 import { PasswordField } from './components/PasswordField'
 import { Dashboard, POS, Products, Inventory, Sales, Purchases, Customers, Suppliers, Expenses, Reports, UsersPage } from './components/BusinessPages'
 import { parseBackup, displayDate } from './lib/data'
@@ -39,19 +39,19 @@ function App() {
   const [showMobileNav, setShowMobileNav] = useState(false)
   const [toast, setToast] = useState('')
   const [switchingUser, setSwitchingUser] = useState(false)
-  const go = (next: Page) => { if (!isAdmin() && !['pos', 'sales', 'customers', 'help', 'about'].includes(next)) return; setPage(next); setShowMobileNav(false) }
+  const go = (next: Page) => { const inventoryPages: Page[] = ['dashboard', 'pos', 'products', 'inventory', 'purchases', 'suppliers', 'sales', 'customers', 'help', 'about']; if (!isAdmin() && !(canManageInventory() ? inventoryPages.includes(next) : ['pos', 'sales', 'customers', 'help', 'about'].includes(next))) return; setPage(next); setShowMobileNav(false) }
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2600) }
 
   if (loadError) return <main className="auth-page"><p role="alert">{loadError}</p></main>
   if (!setupComplete) return <SetupWizard />
   if (!sessionId || !users.some(u => u.id === sessionId && u.active)) return <AuthScreen switchingUser={switchingUser} />
-  const shownPage = !isAdmin() && !['pos', 'sales', 'customers', 'help', 'about'].includes(page) ? 'pos' : page
+  const inventoryPages: Page[] = ['dashboard', 'pos', 'products', 'inventory', 'purchases', 'suppliers', 'sales', 'customers', 'help', 'about']; const shownPage = !isAdmin() && !(canManageInventory() ? inventoryPages.includes(page) : ['pos', 'sales', 'customers', 'help', 'about'].includes(page)) ? 'pos' : page
   return <div className="app" dir="rtl" style={{ '--primary': business.primaryColor } as CSSProperties}>
     <Sidebar page={shownPage} onNavigate={go} open={showMobileNav} onClose={() => setShowMobileNav(false)} />
     <main className="main-shell">
       <header className="topbar">
         <div className="topbar-start"><button className="icon-button mobile-menu" onClick={() => setShowMobileNav(true)}><Menu size={20} /></button><div className="offline-pill"><span className="online-dot" /> يعمل بدون إنترنت</div></div>
-        <div className="topbar-actions"><button className="btn secondary" onClick={() => { if (!window.confirm('تبديل المستخدم؟ ستُغلق أي فاتورة أو تعديلات لم تحفظها بعد.')) return; setSwitchingUser(true); logout(); setPage('dashboard'); setShowMobileNav(false); setToast('') }}><Users size={18} />تبديل المستخدم</button><button className="icon-button" title="تسجيل الخروج" aria-label="تسجيل الخروج" onClick={() => { setSwitchingUser(false); logout(); setPage('dashboard') }}><LogOut size={19} /></button><div className="top-user"><div className="avatar small">{activeUser.slice(0, 1)}</div><div><b>{activeUser}</b><small>{isAdmin() ? 'مدير النظام' : 'كاشير'}</small></div><ChevronDown size={15} /></div></div>
+        <div className="topbar-actions"><button className="btn secondary" onClick={() => { if (!window.confirm('تبديل المستخدم؟ ستُغلق أي فاتورة أو تعديلات لم تحفظها بعد.')) return; setSwitchingUser(true); logout(); setPage('dashboard'); setShowMobileNav(false); setToast('') }}><Users size={18} />تبديل المستخدم</button><button className="icon-button" title="تسجيل الخروج" aria-label="تسجيل الخروج" onClick={() => { setSwitchingUser(false); logout(); setPage('dashboard') }}><LogOut size={19} /></button><div className="top-user"><div className="avatar small">{activeUser.slice(0, 1)}</div><div><b>{activeUser}</b><small>{isAdmin() ? 'مدير النظام' : canManageInventory() ? 'مدير مخزن' : 'بائع / كاشير'}</small></div><ChevronDown size={15} /></div></div>
       </header>
       <div className="page-wrap">
         <PageHeader page={shownPage} onNavigate={go} />
@@ -81,9 +81,9 @@ function Sidebar({ page, onNavigate, open, onClose }: { page: Page; onNavigate: 
     <div className="brand"><div className="brand-mark"><img src={logoUrl} alt="Dukkan" /></div><div><strong>Dukkan</strong><span>إدارة أعمالك بذكاء</span></div><button className="icon-button close-sidebar" onClick={onClose}><X size={18} /></button></div>
     <div className="business-mini"><div className="business-logo">{business.logo ? <img src={business.logo} /> : <Store size={19} />}</div><div><b>{business.name}</b><small>{business.type}</small></div></div>
     <div className="nav-label">الرئيسية</div>
-    <nav>{nav.slice(0, 2).filter(item => isAdmin() || item.id === 'pos').map((item) => <NavItem key={item.id} item={item} active={page === item.id} onNavigate={onNavigate} />)}</nav>
+    <nav>{nav.slice(0, 2).filter(item => isAdmin() || (canManageInventory() ? ['dashboard', 'pos'].includes(item.id) : item.id === 'pos')).map((item) => <NavItem key={item.id} item={item} active={page === item.id} onNavigate={onNavigate} />)}</nav>
     <div className="nav-label">إدارة النشاط</div>
-    <nav>{nav.slice(2).filter(item => isAdmin() || ['sales', 'customers'].includes(item.id)).map((item) => <NavItem key={item.id} item={item} active={page === item.id} onNavigate={onNavigate} />)}</nav>
+    <nav>{nav.slice(2).filter(item => isAdmin() || (canManageInventory() ? ['products', 'inventory', 'sales', 'purchases', 'customers', 'suppliers'].includes(item.id) : ['sales', 'customers'].includes(item.id))).map((item) => <NavItem key={item.id} item={item} active={page === item.id} onNavigate={onNavigate} />)}</nav>
     <div className="nav-label">النظام</div>
     <nav>
       {isAdmin() && <NavItem item={{ id: 'users', label: 'المستخدمون والصلاحيات', icon: ShieldCheck }} active={page === 'users'} onNavigate={onNavigate} />}
