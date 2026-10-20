@@ -1,6 +1,6 @@
 import { useState, type ReactNode, type FormEvent } from 'react'
 import { Plus, Printer, ArrowDownToLine, X, Trash2, Search, Check } from 'lucide-react'
-import { useAppStore, isAdmin } from '../store'
+import { useAppStore, isAdmin, canManageInventory } from '../store'
 import { PasswordField } from './PasswordField'
 import type { Product, Sale, SaleLine, Purchase, Payment, InventoryBatch } from '../types'
 import { formatMoney, parseMoney } from '../lib/money'
@@ -72,7 +72,7 @@ export function Products({ notify }: Notify) {
   const products = s.products.filter(p => [p.name, p.sku, p.barcode || '', p.category].some(v => v.includes(q)))
   const headings = ['المنتج', 'الرمز', 'التصنيف', 'الوحدة', 'سعر البيع', 'المخزون', 'الحالة']
   const rows = products.map(p => [p.name, p.sku, p.category, p.unit, formatMoney(p.price), p.trackInventory ? p.stock : 'خدمة', p.status === 'active' ? 'نشط' : 'متوقف'])
-  return <div className="page-content"><div className="toolbar"><SearchBox value={q} change={setQ} />{isAdmin() && <button className="btn primary" onClick={() => setEdit('new')}><Plus size={18} />إضافة منتج</button>}</div><Outputs title="المنتجات" headings={headings} rows={rows} /><Table headings={[...headings, 'إجراء']} rows={rows.map((row, i) => [...row, isAdmin() && <button className="small-action" onClick={() => setEdit(products[i])}>تعديل</button>])} />{edit && <ProductForm product={edit === 'new' ? undefined : edit} close={() => setEdit(null)} done={() => { setEdit(null); notify('تم حفظ المنتج') }} />}</div>
+  return <div className="page-content"><div className="toolbar"><SearchBox value={q} change={setQ} />{canManageInventory() && <button className="btn primary" onClick={() => setEdit('new')}><Plus size={18} />إضافة منتج</button>}</div><Outputs title="المنتجات" headings={headings} rows={rows} /><Table headings={[...headings, 'إجراء']} rows={rows.map((row, i) => [...row, canManageInventory() && <button className="small-action" onClick={() => setEdit(products[i])}>تعديل</button>])} />{edit && <ProductForm product={edit === 'new' ? undefined : edit} close={() => setEdit(null)} done={() => { setEdit(null); notify('تم حفظ المنتج') }} />}</div>
 }
 function ProductForm({ product, close, done }: { product?: Product; close: () => void; done: () => void }) {
   const s = useAppStore(), [error, setError] = useState(''), [tracksInventory, setTracksInventory] = useState(product?.trackInventory ?? true), [tracksBatches, setTracksBatches] = useState(product?.trackBatches ?? false), [tracksExpiry, setTracksExpiry] = useState(product?.trackExpiry ?? false)
