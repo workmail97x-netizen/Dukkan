@@ -346,6 +346,7 @@ export const useAppStore = create<State>()((set, get) => {
   }
 })
 export const isAdmin = () => useAppStore.getState().users.some(u => u.id === useAppStore.getState().sessionId && u.role === 'admin' && u.active)
+export const canManageInventory = () => useAppStore.getState().users.some(u => u.id === useAppStore.getState().sessionId && ['admin', 'warehouse_manager'].includes(u.role) && u.active)
 
 export async function initializeDesktopPersistence(): Promise<void> {
   if (!tauriRuntime()) return
