@@ -19,7 +19,7 @@ const amount = (n: number) => { if (!Number.isSafeInteger(n) || n < 0) throw new
 const validDate = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date
 type PersonInput = Pick<Customer, 'name' | 'phone' | 'city'>
 type ProductInput = Omit<Product, 'id' | 'sku' | 'trackBatches' | 'trackExpiry' | 'expiryWarningDays'> & { sku?: string; trackBatches?: boolean; trackExpiry?: boolean; expiryWarningDays?: number }
-type PurchaseInput = { productId: string; qty: number; cost: number; lotNumber?: string; productionDate?: string; expiryDate?: string }
+type PurchaseInput = { productId: string; qty: number; cost: number; salePrice?: number; barcode?: string; lotNumber?: string; productionDate?: string; expiryDate?: string }
 type State = Data & {
   sessionId: string | null; loadError: string
   completeSetup: (business: Business, user: { name: string; username: string; password: string }) => Promise<void>
@@ -145,7 +145,7 @@ export const useAppStore = create<State>()((set, get) => {
       await commit({ products: get().products.map(p => p.id === product.id ? { ...product, stock: old.stock } : p) })
     },
     addCustomer: async person => { access(); await commit({ customers: [...get().customers, { ...person, name: required(person.name), id: id('C'), balance: 0, purchases: 0, lastPurchase: '' }] }) },
-    addSupplier: async person => { access(true); await commit({ suppliers: [...get().suppliers, { ...person, name: required(person.name), id: id('S'), balance: 0, purchases: 0, lastPurchase: '' }] }) },
+    addSupplier: async person => { accessInventory(); await commit({ suppliers: [...get().suppliers, { ...person, name: required(person.name), id: id('S'), balance: 0, purchases: 0, lastPurchase: '' }] }) },
     addExpense: async expense => { access(true); if (!amount(expense.amount)) throw new Error('أدخل مبلغاً أكبر من صفر'); if (expense.date && !validDate(expense.date)) throw new Error('التاريخ غير صالح'); const date = expense.date || now(), fiscalYearId = fiscalFor(date).id; await commit({ expenses: [{ ...expense, id: id('EXP'), date, fiscalYearId }, ...get().expenses] }) },
     completeSale: async (cart, paid, customerId, method, discount) => {
       const user = access(), state = get(); amount(paid); amount(discount)
@@ -222,7 +222,7 @@ export const useAppStore = create<State>()((set, get) => {
           if (l.productionDate && !validDate(l.productionDate)) throw new Error('تاريخ الإنتاج غير صالح')
           if (l.productionDate && l.expiryDate && l.productionDate > l.expiryDate) throw new Error('تاريخ الإنتاج يجب أن يسبق انتهاء الصلاحية')
         }
-        return { productId: p.id, name: p.name, unit: p.unit, qty: l.qty, cost: amount(l.cost), price: p.price }
+        const salePrice = l.salePrice === undefined ? p.price : amount(l.salePrice)\n        if (l.barcode?.trim() && [...state.products.flatMap(product => [product.barcode, ...(product.barcodes || []).map(b => b.code)]), ...state.batches.map(batch => batch.barcode)].some(code => code === l.barcode!.trim())) throw new Error('الباركود مستخدم مسبقاً')\n        return { productId: p.id, name: p.name, unit: p.unit, qty: l.qty, cost: amount(l.cost), price: salePrice }
       })
       const total = amount(lines.reduce((n, l) => n + l.qty * l.cost, 0)); amount(paid)
       if (paid > total) throw new Error('المدفوع أكبر من الإجمالي')
@@ -235,7 +235,7 @@ export const useAppStore = create<State>()((set, get) => {
         let batchId: string | undefined
         if (p.trackBatches) {
           const input = cart.find(item => item.productId === p.id)!, lotNumber = input.lotNumber!.trim()
-          const batch: InventoryBatch = { id: id('BAT'), productId: p.id, lotNumber, quantity: l.qty, unitCost: l.cost, supplierId, purchaseId: purchase.id, createdAt: now(), ...(input.productionDate ? { productionDate: input.productionDate } : {}), ...(input.expiryDate ? { expiryDate: input.expiryDate } : {}) }
+          const inputBarcode = input.barcode?.trim() || undefined\n          const batch: InventoryBatch = { id: id('BAT'), productId: p.id, lotNumber, quantity: l.qty, unitCost: l.cost, unitSalePrice: l.price, ...(inputBarcode ? { barcode: inputBarcode } : {}), supplierId, purchaseId: purchase.id, createdAt: now(), ...(input.productionDate ? { productionDate: input.productionDate } : {}), ...(input.expiryDate ? { expiryDate: input.expiryDate } : {}) }
           batches.push(batch); batchId = batch.id
         }
         movements.unshift({ id: id('MOV'), productId: p.id, name: p.name, amount: l.qty, date, reason: purchase.id, balance: stock, ...(batchId ? { batchId } : {}) })
