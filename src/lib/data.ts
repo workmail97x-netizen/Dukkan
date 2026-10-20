@@ -45,7 +45,7 @@ function line(value: unknown) {
 function batchAllocation(value: unknown): BatchAllocation {
   const a = obj(value), quantity = num(a.quantity)
   if (!quantity) return invalid()
-  return { batchId: str(a.batchId), lotNumber: str(a.lotNumber), quantity, unitCost: num(a.unitCost), ...(a.expiryDate === undefined ? {} : { expiryDate: str(a.expiryDate) }) }
+  return { batchId: str(a.batchId), lotNumber: str(a.lotNumber), quantity, unitCost: num(a.unitCost), ...(a.unitSalePrice === undefined ? {} : { unitSalePrice: num(a.unitSalePrice) }), ...(a.expiryDate === undefined ? {} : { expiryDate: str(a.expiryDate) }) }
 }
 export function validateData(value: unknown, includeUsers = true): Data {
   const d = obj(value)
@@ -53,7 +53,7 @@ export function validateData(value: unknown, includeUsers = true): Data {
     setupComplete: bool(d.setupComplete), business: businessData(d.business), activeUser: str(d.activeUser),
     categories: list(d.categories, v => str(v)), lastBackup: d.lastBackup === undefined ? '' : str(d.lastBackup),
     fiscalYears: records(d.fiscalYears ?? [], v => { const y = obj(v), status = str(y.status); if (!['open', 'locked', 'closed'].includes(status)) return invalid(); const startDate = str(y.startDate), endDate = str(y.endDate); if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) return invalid(); let closingSummary: FiscalYear['closingSummary']; if (y.closingSummary !== undefined) { const s = obj(y.closingSummary); closingSummary = { sales: num(s.sales), costOfGoods: num(s.costOfGoods), expenses: num(s.expenses), inventoryLosses: num(s.inventoryLosses), estimatedProfit: num(s.estimatedProfit, true), inventoryValue: num(s.inventoryValue), receivables: num(s.receivables), payables: num(s.payables) } } return { id: str(y.id), name: str(y.name), startDate, endDate, status: status as FiscalYear['status'], createdAt: str(y.createdAt), ...(y.closedAt === undefined ? {} : { closedAt: str(y.closedAt) }), ...(closingSummary ? { closingSummary } : {}) } }),
-    products: records(d.products, v => { const p = obj(v); if (!['active', 'inactive'].includes(str(p.status))) return invalid(); const trackInventory = bool(p.trackInventory), trackBatches = p.trackBatches === undefined ? false : bool(p.trackBatches), trackExpiry = p.trackExpiry === undefined ? false : bool(p.trackExpiry); if (trackBatches && !trackInventory || trackExpiry && !trackBatches) return invalid(); return { id: str(p.id), name: str(p.name), sku: str(p.sku), ...(p.barcode === undefined ? {} : { barcode: str(p.barcode) }), category: str(p.category), unit: str(p.unit), cost: num(p.cost), price: num(p.price), wholesalePrice: num(p.wholesalePrice), stock: num(p.stock), minStock: num(p.minStock), trackInventory, trackBatches, trackExpiry, expiryWarningDays: p.expiryWarningDays === undefined ? 30 : num(p.expiryWarningDays), status: p.status as Product['status'] } }),
+    products: records(d.products, v => { const p = obj(v); if (!['active', 'inactive'].includes(str(p.status))) return invalid(); const trackInventory = bool(p.trackInventory), trackBatches = p.trackBatches === undefined ? false : bool(p.trackBatches), trackExpiry = p.trackExpiry === undefined ? false : bool(p.trackExpiry); if (trackBatches && !trackInventory || trackExpiry && !trackBatches) return invalid(); const barcodes = p.barcodes === undefined ? undefined : list(p.barcodes, value => { const b = obj(value), kind = str(b.kind); if (!['product', 'batch'].includes(kind)) return invalid(); return { id: str(b.id), code: str(b.code), kind: kind as 'product' | 'batch', ...(b.batchId === undefined ? {} : { batchId: str(b.batchId) }), ...(b.label === undefined ? {} : { label: str(b.label) }) } }); if (barcodes?.some(b => !b.code.trim() || (b.kind === 'batch' && !b.batchId))) return invalid(); return { id: str(p.id), name: str(p.name), sku: str(p.sku), ...(p.barcode === undefined ? {} : { barcode: str(p.barcode) }), ...(barcodes ? { barcodes } : {}), category: str(p.category), unit: str(p.unit), cost: num(p.cost), price: num(p.price), wholesalePrice: num(p.wholesalePrice), stock: num(p.stock), minStock: num(p.minStock), trackInventory, trackBatches, trackExpiry, expiryWarningDays: p.expiryWarningDays === undefined ? 30 : num(p.expiryWarningDays), status: p.status as Product['status'] } }),
     customers: records(d.customers, party), suppliers: records(d.suppliers, v => party(v, true)),
     sales: records(d.sales, v => {
       const s = obj(v), total = num(s.total), paid = num(s.paid)
@@ -66,12 +66,12 @@ export function validateData(value: unknown, includeUsers = true): Data {
     expenses: records(d.expenses, v => { const e = obj(v); return { id: str(e.id), category: str(e.category), note: str(e.note), amount: num(e.amount), date: str(e.date), ...(e.fiscalYearId === undefined ? {} : { fiscalYearId: str(e.fiscalYearId) }) } }),
     purchases: records(d.purchases ?? [], v => { const p = obj(v), lines = list(p.lines, line), total = num(p.total), paid = num(p.paid); if (!lines.length || total !== lines.reduce((n, l) => n + l.cost * l.qty, 0) || paid > total) return invalid(); return { id: str(p.id), supplierId: str(p.supplierId), supplier: str(p.supplier), date: str(p.date), total, paid, lines, note: str(p.note), ...(p.fiscalYearId === undefined ? {} : { fiscalYearId: str(p.fiscalYearId) }) } }),
     movements: records(d.movements ?? [], v => { const m = obj(v), type = m.type === undefined ? undefined : str(m.type); if (type && !['sale', 'purchase', 'adjustment', 'expired_disposal', 'damaged_disposal', 'supplier_return'].includes(type)) return invalid(); return { id: str(m.id), productId: str(m.productId), name: str(m.name), amount: num(m.amount, true), balance: num(m.balance), date: str(m.date), reason: str(m.reason), ...(m.batchId === undefined ? {} : { batchId: str(m.batchId) }), ...(type ? { type: type as StockMovement['type'] } : {}) } }),
-    batches: records(d.batches ?? [], v => { const b = obj(v); return { id: str(b.id), productId: str(b.productId), lotNumber: str(b.lotNumber), quantity: num(b.quantity), ...(b.productionDate === undefined ? {} : { productionDate: str(b.productionDate) }), ...(b.expiryDate === undefined ? {} : { expiryDate: str(b.expiryDate) }), unitCost: num(b.unitCost), supplierId: str(b.supplierId), purchaseId: str(b.purchaseId), createdAt: str(b.createdAt) } }),
+    batches: records(d.batches ?? [], v => { const b = obj(v); return { id: str(b.id), productId: str(b.productId), lotNumber: str(b.lotNumber), ...(b.barcode === undefined ? {} : { barcode: str(b.barcode) }), quantity: num(b.quantity), ...(b.productionDate === undefined ? {} : { productionDate: str(b.productionDate) }), ...(b.expiryDate === undefined ? {} : { expiryDate: str(b.expiryDate) }), unitCost: num(b.unitCost), ...(b.unitSalePrice === undefined ? {} : { unitSalePrice: num(b.unitSalePrice) }), supplierId: str(b.supplierId), purchaseId: str(b.purchaseId), createdAt: str(b.createdAt) } }),
     inventoryLosses: records(d.inventoryLosses ?? [], v => { const x = obj(v), kind = str(x.kind); if (!['expired', 'damaged'].includes(kind)) return invalid(); return { id: str(x.id), productId: str(x.productId), batchId: str(x.batchId), lotNumber: str(x.lotNumber), quantity: num(x.quantity), unitCost: num(x.unitCost), totalCost: num(x.totalCost), ...(x.expiryDate === undefined ? {} : { expiryDate: str(x.expiryDate) }), kind: kind as InventoryLoss['kind'], reason: str(x.reason), userId: str(x.userId), userName: str(x.userName), date: str(x.date) } }),
     supplierReturns: records(d.supplierReturns ?? [], v => { const x = obj(v); return { id: str(x.id), productId: str(x.productId), batchId: str(x.batchId), supplierId: str(x.supplierId), purchaseId: str(x.purchaseId), quantity: num(x.quantity), unitCost: num(x.unitCost), total: num(x.total), reason: str(x.reason), userId: str(x.userId), userName: str(x.userName), date: str(x.date) } }),
     auditEvents: records(d.auditEvents ?? [], v => { const x = obj(v), action = str(x.action); if (!['batch_adjustment', 'expired_disposal', 'damaged_disposal', 'supplier_return'].includes(action) || str(x.entityType) !== 'batch') return invalid(); return { id: str(x.id), action: action as AuditEvent['action'], entityType: 'batch', entityId: str(x.entityId), reference: str(x.reference), reason: str(x.reason), userId: str(x.userId), userName: str(x.userName), date: str(x.date) } }),
     payments: records(d.payments ?? [], v => { const p = obj(v); if (!['customer', 'supplier'].includes(str(p.kind))) return invalid(); return { id: str(p.id), partyId: str(p.partyId), kind: p.kind as Payment['kind'], amount: num(p.amount), date: str(p.date), note: str(p.note), ...(p.fiscalYearId === undefined ? {} : { fiscalYearId: str(p.fiscalYearId) }) } }),
-    users: includeUsers ? records(d.users ?? [], v => { const u = obj(v); if (!['admin', 'cashier'].includes(str(u.role)) || !/^[a-f0-9]{64}$/.test(str(u.hash)) || !/^[a-f0-9]{32}$/.test(str(u.salt))) return invalid(); return { id: str(u.id), username: str(u.username), name: str(u.name), role: u.role as AppUser['role'], active: bool(u.active), salt: str(u.salt), hash: str(u.hash) } }) : [],
+    users: includeUsers ? records(d.users ?? [], v => { const u = obj(v); if (!['admin', 'warehouse_manager', 'cashier'].includes(str(u.role)) || !/^[a-f0-9]{64}$/.test(str(u.hash)) || !/^[a-f0-9]{32}$/.test(str(u.salt))) return invalid(); return { id: str(u.id), username: str(u.username), name: str(u.name), role: u.role as AppUser['role'], active: bool(u.active), salt: str(u.salt), hash: str(u.hash) } }) : [],
   }
   if (result.setupComplete && !result.fiscalYears.length) {
     const year = new Date().getFullYear()
@@ -88,11 +88,30 @@ export function validateData(value: unknown, includeUsers = true): Data {
   const purchaseIds = new Set(result.purchases.map(purchase => purchase.id))
   const batchById = new Map(result.batches.map(batch => [batch.id, batch]))
   const batchKeys = new Set<string>(), batchStock = new Map<string, number>()
+  const barcodeOwners = new Map<string, string>()
+  const registerBarcode = (code: string, owner: string) => {
+    const normalized = code.trim()
+    if (!normalized) return
+    const existing = barcodeOwners.get(normalized)
+    if (existing && existing !== owner) return invalid()
+    barcodeOwners.set(normalized, owner)
+  }
+  for (const product of result.products) {
+    if (product.barcode) registerBarcode(product.barcode, product.id)
+    for (const barcode of product.barcodes || []) {
+      if (barcode.kind === 'batch') {
+        const linked = result.batches.find(batch => batch.id === barcode.batchId && batch.productId === product.id)
+        if (!linked) return invalid()
+        registerBarcode(barcode.code, linked.id)
+      } else registerBarcode(barcode.code, product.id)
+    }
+  }
   for (const batch of result.batches) {
     const product = productById.get(batch.productId)
     const key = `${batch.productId}\0${batch.purchaseId}\0${batch.lotNumber}`
     if (!product?.trackBatches || batchKeys.has(key) || batch.expiryDate && !/^\d{4}-\d{2}-\d{2}$/.test(batch.expiryDate) || !supplierIds.has(batch.supplierId) || !purchaseIds.has(batch.purchaseId)) return invalid()
     batchKeys.add(key)
+    if (batch.barcode) registerBarcode(batch.barcode, batch.id)
     batchStock.set(batch.productId, (batchStock.get(batch.productId) || 0) + batch.quantity)
   }
   for (const product of result.products) if (product.trackBatches && (batchStock.get(product.id) || 0) !== product.stock) return invalid()
