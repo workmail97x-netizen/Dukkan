@@ -148,6 +148,16 @@ describe('batch and expiry inventory', () => {
     expect(useAppStore.getState().movements.every(m => Boolean(m.batchId))).toBe(true)
   })
 
+  it('sells batch-tracked items at each receipt batch price and stores batch barcode', async () => {
+    const { product, supplier } = await seedBatchProduct(), s = useAppStore.getState()
+    await s.completePurchase(supplier.id, [{ productId: product.id, qty: 2, cost: 1000, salePrice: 1500, barcode: 'MILK-BATCH-A', lotNumber: 'PRICE-A', expiryDate: '2099-01-10' }], 0, '2026-09-12', '')
+    await s.completePurchase(supplier.id, [{ productId: product.id, qty: 3, cost: 1200, salePrice: 2400, barcode: 'MILK-BATCH-B', lotNumber: 'PRICE-B', expiryDate: '2099-02-10' }], 0, '2026-09-13', '')
+    const sale = await useAppStore.getState().completeSale([{ productId: product.id, qty: 3 }], 5400, '', 'نقدي', 0)
+    expect(sale.total).toBe(5400)
+    expect(sale.lines?.map(line => [line.qty, line.price])).toEqual([[2, 1500], [1, 2400]])
+    expect(useAppStore.getState().batches.map(batch => [batch.barcode, batch.quantity])).toEqual([['MILK-BATCH-A', 0], ['MILK-BATCH-B', 2]])
+  })
+
   it('keeps identical lot numbers from separate receipts traceable to their suppliers', async () => {
     const { product, supplier } = await seedBatchProduct(), s = useAppStore.getState()
     await s.addSupplier({ name: 'Second Dairy', phone: '', city: '' })
