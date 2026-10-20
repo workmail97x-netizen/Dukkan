@@ -133,7 +133,7 @@ export const useAppStore = create<State>()((set, get) => {
     addProduct: async product => {
       accessInventory(); required(product.name)
       const sku = product.sku?.trim() || id('PRD')
-      if (get().products.some(p => p.sku === sku || (product.barcode && p.barcode === product.barcode))) throw new Error('رمز المنتج أو الباركود موجود بالفعل')
+      const incomingCodes = [product.barcode, ...(product.barcodes || []).map(b => b.code)].map(code => code?.trim()).filter(Boolean) as string[]; const usedCodes = new Set([...get().products.flatMap(p => [p.barcode, ...(p.barcodes || []).map(b => b.code)]), ...get().batches.map(b => b.barcode)].filter(Boolean)); if (get().products.some(p => p.sku === sku) || incomingCodes.some(code => usedCodes.has(code)) || new Set(incomingCodes).size !== incomingCodes.length) throw new Error('رمز المنتج أو أحد الباركودات مستخدم مسبقاً')
       const trackBatches = Boolean(product.trackBatches), trackExpiry = Boolean(product.trackExpiry)
       if (trackBatches && !product.trackInventory || trackExpiry && !trackBatches) throw new Error('تتبع الصلاحية يتطلب تتبع الدفعات والمخزون')
       if (trackBatches && product.stock) throw new Error('أضف رصيد المنتج المتتبع بالدفعات من خلال فاتورة شراء')
@@ -142,7 +142,7 @@ export const useAppStore = create<State>()((set, get) => {
     },
     editProduct: async product => {
       accessInventory(); required(product.name)
-      if (get().products.some(p => p.id !== product.id && (p.sku === product.sku || (product.barcode && p.barcode === product.barcode)))) throw new Error('رمز المنتج أو الباركود موجود بالفعل')
+      const incomingCodes = [product.barcode, ...(product.barcodes || []).filter(b => b.kind === 'product').map(b => b.code)].map(code => code?.trim()).filter(Boolean) as string[]; const usedCodes = new Set([...get().products.filter(p => p.id !== product.id).flatMap(p => [p.barcode, ...(p.barcodes || []).map(b => b.code)]), ...get().batches.map(b => b.barcode)].filter(Boolean)); if (get().products.some(p => p.id !== product.id && p.sku === product.sku) || incomingCodes.some(code => usedCodes.has(code)) || new Set(incomingCodes).size !== incomingCodes.length) throw new Error('رمز المنتج أو أحد الباركودات مستخدم مسبقاً')
       const old = get().products.find(p => p.id === product.id)
       if (!old) throw new Error('المنتج غير موجود')
       if (product.trackBatches && !old.trackBatches && old.stock) throw new Error('صفّر المخزون الحالي قبل تفعيل تتبع الدفعات')
@@ -311,7 +311,7 @@ export const useAppStore = create<State>()((set, get) => {
       await commit({ products: get().products.map(p => p.id === productId ? { ...p, stock: balance } : p), movements: [{ id: id('MOV'), productId, name: p.name, amount: change, date: now(), reason, balance }, ...get().movements] })
     },
     adjustBatchStock: async (batchId, change, reason) => {
-      const user = access(true); fiscalFor(now()); const state = get(), batch = state.batches.find(b => b.id === batchId), product = batch && state.products.find(p => p.id === batch.productId)
+      const user = accessInventory(); fiscalFor(now()); const state = get(), batch = state.batches.find(b => b.id === batchId), product = batch && state.products.find(p => p.id === batch.productId)
       if (!batch || !product || !Number.isSafeInteger(change) || !change || batch.quantity + change < 0 || product.stock + change < 0) throw new Error('تسوية الدفعة غير صالحة أو تتجاوز الكمية المتاحة')
       reason = required(reason); const date = now(), reference = id('ADJ'), balance = product.stock + change
       await commit({
@@ -322,7 +322,7 @@ export const useAppStore = create<State>()((set, get) => {
       })
     },
     disposeBatchStock: async (batchId, quantity, kind, reason) => {
-      const user = access(true); fiscalFor(now()); const state = get(), batch = state.batches.find(b => b.id === batchId), product = batch && state.products.find(p => p.id === batch.productId)
+      const user = accessInventory(); fiscalFor(now()); const state = get(), batch = state.batches.find(b => b.id === batchId), product = batch && state.products.find(p => p.id === batch.productId)
       if (!batch || !product || !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > batch.quantity || !['expired', 'damaged'].includes(kind)) throw new Error('كمية الإتلاف غير صالحة أو تتجاوز كمية الدفعة')
       if (kind === 'expired' && (!batch.expiryDate || batch.expiryDate >= new Date().toISOString().slice(0, 10))) throw new Error('لا يمكن تسجيل الدفعة كمنتهية قبل تاريخ انتهاء الصلاحية')
       reason = required(reason); const date = now(), lossId = id('LOS'), totalCost = amount(quantity * batch.unitCost), balance = product.stock - quantity
@@ -336,7 +336,7 @@ export const useAppStore = create<State>()((set, get) => {
       })
     },
     returnBatchToSupplier: async (batchId, quantity, reason) => {
-      const user = access(true); fiscalFor(now()); const state = get(), batch = state.batches.find(b => b.id === batchId), product = batch && state.products.find(p => p.id === batch.productId), supplier = batch && state.suppliers.find(s => s.id === batch.supplierId)
+      const user = accessInventory(); fiscalFor(now()); const state = get(), batch = state.batches.find(b => b.id === batchId), product = batch && state.products.find(p => p.id === batch.productId), supplier = batch && state.suppliers.find(s => s.id === batch.supplierId)
       if (!batch || !product || !supplier || !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > batch.quantity) throw new Error('كمية الإرجاع غير صالحة أو تتجاوز كمية الدفعة')
       reason = required(reason); const date = now(), returnId = id('RET'), total = amount(quantity * batch.unitCost), balance = product.stock - quantity
       await commit({
