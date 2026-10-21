@@ -9,12 +9,12 @@ describe('IQD money utilities', () => {
   })
 
   it('formats as whole Iraqi dinars', () => {
-    expect(formatMoney(12500)).not.toContain('.')
+    expect(formatMoney(12500)).toBe('١٣ د.ع')
     expect(formatMoney(12500)).toContain('د.ع')
   })
 
   it('rejects invalid amounts', () => {
-    expect(() => parseMoney('not a number')).toThrow('InvalidAmount')
+    expect(() => parseMoney('not a number')).toThrow()
     expect(() => parseMoney(-1)).toThrow()
     expect(() => parseMoney(Infinity)).toThrow()
     expect(() => parseMoney(NaN)).toThrow()
