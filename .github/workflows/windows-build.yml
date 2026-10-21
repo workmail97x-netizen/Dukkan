@@ -46,7 +46,7 @@ jobs:
           $app = $null
           foreach ($location in $locations) {
             if (Test-Path $location) {
-              $app = Get-ChildItem -Path $location -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq 'dukkan.exe' } | Select-Object -First 1
+              $app = Get-ChildItem -Path $location -Recurse -File -ErrorAction SilentlyContinue | Where-Object { @('dukkan.exe', 'mustafa-library.exe', 'مكتبة المصطفى.exe') -contains $_.Name.ToLowerInvariant() } | Select-Object -First 1
               if ($app) { break }
             }
           }
