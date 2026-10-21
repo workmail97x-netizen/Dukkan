@@ -7,9 +7,9 @@ export type Data = {
 }
 export const emptyData: Data = {
   setupComplete: false,
-  business: { name: '', type: 'متجر تجزئة', phone: '', address: '', taxNumber: '', logo: '', primaryColor: '#d99a2b', currency: 'الدينار الليبي' },
+  business: { name: 'مكتبة المصطفى', type: 'مكتبة كتب وملازم وقرطاسية', phone: '', address: '', taxNumber: '', logo: '', primaryColor: '#176b55', currency: 'الدينار العراقي' },
   products: [], customers: [], suppliers: [], sales: [], expenses: [], purchases: [], movements: [], batches: [], inventoryLosses: [], supplierReturns: [], auditEvents: [], payments: [], users: [], fiscalYears: [],
-  categories: ['مواد غذائية', 'مشروبات', 'منزلية', 'خدمات', 'أخرى'], activeUser: '', lastBackup: '',
+  categories: ['كتب', 'ملازم', 'قرطاسية', 'دفاتر', 'أقلام', 'مستلزمات مدرسية', 'تصوير واستنساخ', 'أخرى'], activeUser: '', lastBackup: '',
 }
 function invalid(): never { throw new Error('بيانات غير صالحة: لم يتم استبدال السجلات الحالية') }
 function obj(value: unknown): Record<string, unknown> {
