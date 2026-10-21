@@ -1,4 +1,4 @@
-export const CURRENCY = 'د.ل'
+export const CURRENCY = 'د.ع'
 export const MINOR_UNITS = 1000
 
 export function parseMoney(value: string | number): number {
@@ -16,13 +16,13 @@ export function parseMoney(value: string | number): number {
 }
 
 export function formatMoney(minor: number, compact = false): string {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+  return new Intl.NumberFormat('ar-IQ', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
     notation: compact ? 'compact' : 'standard'
-  }).format(minor / MINOR_UNITS) + ' ' + CURRENCY
+  }).format(Math.round(minor / MINOR_UNITS)) + ' ' + CURRENCY
 }
 
 export function formatNumber(value: number): string {
-  return new Intl.NumberFormat('ar-LY').format(value)
+  return new Intl.NumberFormat('ar-IQ').format(value)
 }
