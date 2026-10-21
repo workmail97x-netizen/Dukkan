@@ -3,7 +3,7 @@ export const MINOR_UNITS = 1000
 
 export function parseMoney(value: string | number): number {
   if (typeof value === 'number') {
-    if (!Number.isFinite(value) || value < 0 || !Number.isSafeInteger(Math.round(value * MINOR_UNITS))) throw new Error('أدخل مبلغاً صحيحاً غير سالب')
+    if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0 || !Number.isSafeInteger(Math.round(value * MINOR_UNITS))) throw new Error('أدخل مبلغاً صحيحاً بالدينار العراقي دون كسور')
     return Math.round(value * MINOR_UNITS)
   }
   const normalized = value
@@ -11,7 +11,7 @@ export function parseMoney(value: string | number): number {
     .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
     .replace('٫', '.')
   const amount = Number(normalized)
-  if (!normalized || !/^\d+(\.\d{0,3})?$/.test(normalized) || !Number.isFinite(amount) || amount < 0 || !Number.isSafeInteger(Math.round(amount * MINOR_UNITS))) throw new Error('InvalidAmount')
+  if (!normalized || !/^\d+$/.test(normalized) || !Number.isFinite(amount) || amount < 0 || !Number.isSafeInteger(Math.round(amount * MINOR_UNITS))) throw new Error('أدخل مبلغاً صحيحاً بالدينار العراقي دون كسور')
   return Math.round(amount * MINOR_UNITS)
 }
 
