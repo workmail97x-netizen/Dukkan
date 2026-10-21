@@ -14,7 +14,6 @@ import { parseBackup, displayDate } from './lib/data'
 import { download } from './lib/output'
 import type { Business, Product } from './types'
 import { formatMoney, formatNumber, parseMoney } from './lib/money'
-import logoUrl from '../logo.png'
 import './help.css'
 
 type Icon = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>
